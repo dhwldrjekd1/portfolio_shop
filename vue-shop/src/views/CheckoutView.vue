@@ -1,7 +1,6 @@
 <template>
   <div class="checkout-page">
     <div class="container">
-
       <!-- ===== 헤더 ===== -->
       <div class="checkout-header">
         <p class="checkout-label">CHECKOUT</p>
@@ -24,47 +23,83 @@
       </div>
 
       <div v-else class="row g-4">
-
         <!-- ===== 왼쪽: 폼 ===== -->
         <div class="col-lg-7">
-
           <!-- Step 1: 배송 정보 -->
           <div v-if="step === 1" class="step-block">
             <h2 class="step-title">배송 정보</h2>
             <div class="row g-3">
               <div class="col-6">
                 <label class="form-label-custom">이름</label>
-                <input v-model="form.name" type="text" class="input-custom" placeholder="홍길동" />
+                <input
+                  v-model="form.name"
+                  type="text"
+                  class="input-custom"
+                  placeholder="홍길동"
+                />
               </div>
               <div class="col-6">
                 <label class="form-label-custom">전화번호</label>
-                <input v-model="form.phone" type="tel" class="input-custom" placeholder="010-0000-0000" />
+                <input
+                  v-model="form.phone"
+                  type="tel"
+                  class="input-custom"
+                  placeholder="010-0000-0000"
+                />
               </div>
               <div class="col-12">
                 <label class="form-label-custom">이메일</label>
-                <input v-model="form.email" type="email" class="input-custom" placeholder="example@email.com" />
+                <input
+                  v-model="form.email"
+                  type="email"
+                  class="input-custom"
+                  placeholder="example@email.com"
+                />
               </div>
               <div class="col-4">
                 <label class="form-label-custom">우편번호</label>
-                <input v-model="form.zipcode" type="text" class="input-custom" placeholder="12345" />
+                <input
+                  v-model="form.zipcode"
+                  type="text"
+                  class="input-custom"
+                  placeholder="12345"
+                />
               </div>
               <div class="col-8">
                 <label class="form-label-custom">주소</label>
-                <input v-model="form.address" type="text" class="input-custom" placeholder="서울시 강남구" />
+                <input
+                  v-model="form.address"
+                  type="text"
+                  class="input-custom"
+                  placeholder="서울시 강남구"
+                />
               </div>
               <div class="col-12">
                 <label class="form-label-custom">상세 주소</label>
-                <input v-model="form.addressDetail" type="text" class="input-custom" placeholder="상세 주소 입력" />
+                <input
+                  v-model="form.addressDetail"
+                  type="text"
+                  class="input-custom"
+                  placeholder="상세 주소 입력"
+                />
               </div>
               <div class="col-12">
                 <label class="form-label-custom">배송 메모</label>
-                <select v-model="form.memo" class="input-custom">
+                <select v-model="form.memo" class="input-custom" @change="onMemoChange">
                   <option value="">배송 메모 선택 (선택)</option>
                   <option>문 앞에 놓아주세요</option>
                   <option>경비실에 맡겨주세요</option>
                   <option>배송 전 연락 바랍니다</option>
-                  <option>직접 입력</option>
+                  <option value="direct">직접 입력</option>
                 </select>
+                <input
+                  v-if="showMemoInput"
+                  v-model="form.memoInput"
+                  type="text"
+                  class="input-custom"
+                  style="margin-top: 8px"
+                  placeholder="배송 메모를 입력해주세요"
+                />
               </div>
             </div>
             <button class="step-next-btn" @click="nextStep">
@@ -92,7 +127,11 @@
             <div v-if="form.payment === 'card'" class="row g-3 mb-4">
               <div class="col-12">
                 <label class="form-label-custom">카드 번호</label>
-                <input type="text" class="input-custom" placeholder="0000 0000 0000 0000" />
+                <input
+                  type="text"
+                  class="input-custom"
+                  placeholder="0000 0000 0000 0000"
+                />
               </div>
               <div class="col-6">
                 <label class="form-label-custom">유효 기간</label>
@@ -122,12 +161,14 @@
             <div class="confirm-address">
               <p class="confirm-address-title">배송지</p>
               <p class="confirm-address-info">{{ form.name }} · {{ form.phone }}</p>
-              <p class="confirm-address-info">{{ form.address }} {{ form.addressDetail }}</p>
+              <p class="confirm-address-info">
+                {{ form.address }} {{ form.addressDetail }}
+              </p>
             </div>
 
             <!-- 상품 목록 -->
             <div class="confirm-item-list">
-              <div v-for="item in store.cart" :key="item.key" class="confirm-item">
+              <div v-for="item in cartItems" :key="item.id" class="confirm-item">
                 <img :src="item.image" :alt="item.name" class="confirm-item-img" />
                 <div class="confirm-item-info">
                   <p class="confirm-item-name">{{ item.name }}</p>
@@ -144,11 +185,12 @@
                 <i class="bi bi-arrow-left me-1"></i> 이전
               </button>
               <button class="order-btn flex-1" @click="placeOrder">
-                <i class="bi bi-lock me-1"></i> 결제 완료 ({{ totalWithShipping.toLocaleString() }}원)
+                <i class="bi bi-lock me-1"></i> 결제 완료 ({{
+                  totalWithShipping.toLocaleString()
+                }}원)
               </button>
             </div>
           </div>
-
         </div>
 
         <!-- ===== 오른쪽: 주문 요약 ===== -->
@@ -161,7 +203,7 @@
 
             <!-- 상품 목록 -->
             <div class="summary-item-list">
-              <div v-for="item in store.cart" :key="item.key" class="summary-item">
+              <div v-for="item in cartItems" :key="item.id" class="summary-item">
                 <img :src="item.image" :alt="item.name" class="summary-item-img" />
                 <div class="summary-item-info">
                   <p class="summary-item-name">{{ item.name }}</p>
@@ -182,7 +224,7 @@
             <div class="summary-row">
               <span>배송비</span>
               <span :class="{ 'free-ship': shippingFree }">
-                {{ shippingFree ? '무료' : '3,000원' }}
+                {{ shippingFree ? "무료" : "3,000원" }}
               </span>
             </div>
 
@@ -194,50 +236,156 @@
             </div>
           </div>
         </div>
-
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { useShopStore } from '@/store/shop'
+import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { useShopStore } from "@/store/shop";
 
-const store = useShopStore()
-const router = useRouter()
-const step = ref(1)
+const store = useShopStore();
+const router = useRouter();
+const step = ref(1);
 
+// ===== 주문 폼 상태 =====
 const form = ref({
-  name: '', phone: '', email: '',
-  zipcode: '', address: '', addressDetail: '',
-  memo: '', payment: 'card'
-})
+  name: store.user?.name || "",
+  phone: "",
+  email: store.user?.email || "",
+  zipcode: "",
+  address: "",
+  addressDetail: "",
+  memo: "",
+  memoInput: "",
+  payment: "card",
+  cardNumber: "",
+});
 
+// ===== 결제 수단 목록 =====
 const paymentMethods = [
-  { value: 'card',  label: '신용카드 / 체크카드', icon: 'bi-credit-card' },
-  { value: 'kakao', label: '카카오페이',           icon: 'bi-phone' },
-  { value: 'naver', label: '네이버페이',           icon: 'bi-n-circle' },
-  { value: 'bank',  label: '계좌이체',             icon: 'bi-bank' }
-]
+  { value: "card", label: "신용카드 / 체크카드", icon: "bi-credit-card" },
+  { value: "kakao", label: "카카오페이", icon: "bi-phone" },
+  { value: "naver", label: "네이버페이", icon: "bi-n-circle" },
+  { value: "bank", label: "계좌이체", icon: "bi-bank" },
+];
 
-const shippingFree = computed(() => store.cartTotal >= 50000)
-const totalWithShipping = computed(() =>
-  store.cartTotal + (shippingFree.value ? 0 : 3000)
-)
+// ===== 장바구니 아이템에 상품 정보 합치기 =====
+const cartItems = computed(() => {
+  return store.cart.map((item) => {
+    const product = store.getProductById(item.itemId);
+    return {
+      ...item,
+      name: product?.name || "상품명 없음",
+      price: product?.price || 0,
+      image: product?.images?.[0] || "",
+    };
+  });
+});
 
-function nextStep() {
-  if (step.value === 1 && (!form.value.name || !form.value.phone || !form.value.address)) {
-    store.showToast('배송 정보를 모두 입력해주세요.', 'error')
-    return
-  }
-  step.value++
+// ===== 배송비 계산 (5만원 이상 무료) =====
+const shippingFree = computed(() => store.cartTotal >= 50000);
+const totalWithShipping = computed(
+  () => store.cartTotal + (shippingFree.value ? 0 : 3000)
+);
+
+// ===== 배송 메모 직접 입력 여부 =====
+const showMemoInput = computed(() => form.value.memo === "direct");
+
+function onMemoChange() {
+  if (form.value.memo !== "direct") form.value.memoInput = "";
 }
 
-function placeOrder() {
-  store.clearCart()
-  router.push('/order-complete')
+// ===== 데이터 로드 =====
+onMounted(() => {
+  store.fetchData();
+});
+
+// ===== 다음 단계 이동 =====
+function nextStep() {
+  if (
+    step.value === 1 &&
+    (!form.value.name || !form.value.phone || !form.value.address)
+  ) {
+    store.showToast("배송 정보를 모두 입력해주세요.", "error");
+    return;
+  }
+  if (step.value === 2 && !form.value.payment) {
+    store.showToast("결제 수단을 선택해주세요.", "error");
+    return;
+  }
+  step.value++;
+}
+
+// ===== 주문 완료 처리 =====
+async function placeOrder() {
+  if (!store.user?.loginId) {
+    store.showLoginModal = true;
+    return;
+  }
+  try {
+    // 배송 메모: 직접 입력이면 memoInput, 아니면 선택값
+    const memo = form.value.memo === "direct" ? form.value.memoInput : form.value.memo;
+
+    // 주소 조합: (우편번호) 기본주소 상세주소 [배송메모]
+    const fullAddress = `(${form.value.zipcode}) ${form.value.address} ${
+      form.value.addressDetail
+    }${memo ? " [" + memo + "]" : ""}`;
+
+    // 장바구니 → 주문 상품 목록 변환
+    const items = store.cart.map((item) => {
+      const product = store.getProductById(item.itemId);
+      return {
+        itemId: item.itemId,
+        quantity: item.qty,
+        itemName: product?.name || "",
+        color: item.color || "",
+        size: item.size || "",
+      };
+    });
+
+    // 주문완료 페이지 표시용 데이터 미리 저장 (clearCart 전에!)
+    const orderItems = store.cart.map((item) => {
+      const product = store.getProductById(item.itemId);
+      return {
+        itemId: item.itemId,
+        name: product?.name || "상품명 없음",
+        image: product?.images?.[0] || "",
+        price: product?.price || 0,
+        qty: item.qty,
+        color: item.color || "",
+        size: item.size || "",
+      };
+    });
+    sessionStorage.setItem("last_order_items", JSON.stringify(orderItems));
+    sessionStorage.setItem("last_order_total", String(totalWithShipping.value));
+
+    // 주문 API 호출
+    const res = await fetch("/api/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        loginId: store.user.loginId,
+        name: form.value.name,
+        address: fullAddress,
+        payment: form.value.payment,
+        cardNumber: form.value.cardNumber || null,
+        amount: totalWithShipping.value,
+        items,
+      }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      await store.clearCart(); // 장바구니 비우기
+      router.push("/order-complete"); // 주문완료 페이지로 이동
+    } else {
+      store.showToast(data.message || "주문 실패", "error");
+    }
+  } catch (e) {
+    store.showToast("오류가 발생했습니다.", "error");
+  }
 }
 </script>
 
@@ -260,7 +408,7 @@ function placeOrder() {
 }
 
 .checkout-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: "Bebas Neue", sans-serif;
   font-size: 40px;
   letter-spacing: 0.08em;
   color: #f2f0eb;
@@ -278,9 +426,16 @@ function placeOrder() {
   margin-bottom: 40px;
 }
 
-.step-indicator span { color: #555; }
-.step-indicator span.active { color: #f2f0eb; }
-.step-indicator i { font-size: 10px; color: #444; }
+.step-indicator span {
+  color: #555;
+}
+.step-indicator span.active {
+  color: #f2f0eb;
+}
+.step-indicator i {
+  font-size: 10px;
+  color: #444;
+}
 
 /* ===== 빈 상태 ===== */
 .empty-state {
@@ -289,7 +444,10 @@ function placeOrder() {
   color: #888;
 }
 
-.empty-state p { margin-bottom: 20px; font-size: 14px; }
+.empty-state p {
+  margin-bottom: 20px;
+  font-size: 14px;
+}
 
 .empty-btn {
   display: inline-block;
@@ -304,12 +462,12 @@ function placeOrder() {
 /* ===== 스텝 블록 ===== */
 .step-block {
   background: #111;
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   padding: 28px;
 }
 
 .step-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: "Bebas Neue", sans-serif;
   font-size: 24px;
   letter-spacing: 0.08em;
   color: #f2f0eb;
@@ -329,21 +487,23 @@ function placeOrder() {
 .input-custom {
   width: 100%;
   background: #0d0d0d;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #f2f0eb;
   padding: 10px 14px;
   font-size: 13px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: "DM Sans", sans-serif;
   outline: none;
   transition: border-color 0.2s;
   appearance: none;
 }
 
 .input-custom:focus {
-  border-color: rgba(255,255,255,0.4);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
-.input-custom::placeholder { color: #555; }
+.input-custom::placeholder {
+  color: #555;
+}
 
 .input-custom option {
   background: #0d0d0d;
@@ -363,21 +523,25 @@ function placeOrder() {
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   cursor: pointer;
   font-size: 13px;
   color: #888;
   transition: all 0.2s;
 }
 
-.payment-item input { display: none; }
+.payment-item input {
+  display: none;
+}
 
 .payment-item.active {
   border-color: #f2f0eb;
   color: #f2f0eb;
 }
 
-.payment-item i { font-size: 18px; }
+.payment-item i {
+  font-size: 18px;
+}
 
 /* ===== 버튼 ===== */
 .step-next-btn {
@@ -393,7 +557,9 @@ function placeOrder() {
   transition: opacity 0.2s;
 }
 
-.step-next-btn:hover { opacity: 0.85; }
+.step-next-btn:hover {
+  opacity: 0.85;
+}
 
 .step-btn-row {
   display: flex;
@@ -405,7 +571,7 @@ function placeOrder() {
   padding: 14px 20px;
   background: transparent;
   color: #888;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   font-size: 12px;
   letter-spacing: 0.08em;
   cursor: pointer;
@@ -418,7 +584,10 @@ function placeOrder() {
   color: #f2f0eb;
 }
 
-.flex-1 { flex: 1; margin-top: 0; }
+.flex-1 {
+  flex: 1;
+  margin-top: 0;
+}
 
 .order-btn {
   flex: 1;
@@ -432,12 +601,14 @@ function placeOrder() {
   transition: opacity 0.2s;
 }
 
-.order-btn:hover { opacity: 0.85; }
+.order-btn:hover {
+  opacity: 0.85;
+}
 
 /* ===== 주문 확인 ===== */
 .confirm-address {
   background: #161616;
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   padding: 16px;
   margin-bottom: 20px;
 }
@@ -477,7 +648,9 @@ function placeOrder() {
   flex-shrink: 0;
 }
 
-.confirm-item-info { flex: 1; }
+.confirm-item-info {
+  flex: 1;
+}
 
 .confirm-item-name {
   font-size: 13px;
@@ -499,7 +672,7 @@ function placeOrder() {
 /* ===== 주문 요약 ===== */
 .order-summary {
   background: #111;
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   padding: 28px;
   position: sticky;
   top: 80px;
@@ -513,7 +686,7 @@ function placeOrder() {
 }
 
 .summary-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: "Bebas Neue", sans-serif;
   font-size: 24px;
   letter-spacing: 0.08em;
   color: #f2f0eb;
@@ -522,7 +695,7 @@ function placeOrder() {
 
 .summary-divider {
   height: 1px;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.08);
   margin: 16px 0;
 }
 
@@ -548,7 +721,9 @@ function placeOrder() {
   flex-shrink: 0;
 }
 
-.summary-item-info { flex: 1; }
+.summary-item-info {
+  flex: 1;
+}
 
 .summary-item-name {
   font-size: 12px;
@@ -576,7 +751,9 @@ function placeOrder() {
   margin-bottom: 8px;
 }
 
-.free-ship { color: #b8a898; }
+.free-ship {
+  color: #b8a898;
+}
 
 .summary-total {
   display: flex;
@@ -587,7 +764,12 @@ function placeOrder() {
 
 /* ===== 모바일 ===== */
 @media (max-width: 768px) {
-  .checkout-page { padding: 32px 0 60px; }
-  .step-indicator { flex-wrap: wrap; gap: 4px; }
+  .checkout-page {
+    padding: 32px 0 60px;
+  }
+  .step-indicator {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
 }
 </style>

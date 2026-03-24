@@ -1,7 +1,6 @@
 <template>
   <div class="board-page">
     <div class="container">
-
       <!-- 헤더 -->
       <div class="board-header">
         <p class="board-label">SUPPORT</p>
@@ -23,17 +22,100 @@
 
       <!-- ===== 공지사항 ===== -->
       <div v-if="currentTab === 'notice'">
-        <div class="post-list">
-          <div
-            v-for="post in notices"
-            :key="post.id"
-            class="post-item"
-            @click="togglePost(post)"
+        <!-- 관리자 등록 버튼 -->
+        <div v-if="store.isAdmin" style="margin-bottom: 16px">
+          <button class="submit-btn" @click="showNoticeForm = !showNoticeForm">
+            공지사항 등록
+          </button>
+        </div>
+
+        <!-- 관리자 등록 폼 -->
+        <div
+          v-if="store.isAdmin && showNoticeForm"
+          class="inquiry-form"
+          style="margin-bottom: 24px"
+        >
+          <div class="form-group">
+            <label class="form-label-custom">제목</label>
+            <input
+              v-model="noticeForm.title"
+              type="text"
+              class="input-custom"
+              placeholder="제목 입력"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label-custom">내용</label>
+            <textarea
+              v-model="noticeForm.content"
+              class="textarea-custom"
+              rows="4"
+              placeholder="내용 입력"
+            ></textarea>
+          </div>
+          <label
+            style="
+              color: #888;
+              font-size: 12px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            "
           >
-            <div class="post-row">
+            <input type="checkbox" v-model="noticeForm.important" /> 중요 공지
+          </label>
+          <button class="submit-btn" @click="submitNotice">등록</button>
+        </div>
+
+        <!-- 수정 폼 -->
+        <div
+          v-if="store.isAdmin && editNotice"
+          class="inquiry-form"
+          style="margin-bottom: 24px"
+        >
+          <div class="form-group">
+            <label class="form-label-custom">제목</label>
+            <input v-model="editNotice.title" type="text" class="input-custom" />
+          </div>
+          <div class="form-group">
+            <label class="form-label-custom">내용</label>
+            <textarea
+              v-model="editNotice.content"
+              class="textarea-custom"
+              rows="4"
+            ></textarea>
+          </div>
+          <label
+            style="
+              color: #888;
+              font-size: 12px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            "
+          >
+            <input type="checkbox" v-model="editNotice.important" /> 중요 공지
+          </label>
+          <div style="display: flex; gap: 8px; justify-content: flex-end">
+            <button class="delete-btn" @click="editNotice = null">취소</button>
+            <button class="submit-btn" @click="submitEditNotice">수정 완료</button>
+          </div>
+        </div>
+
+        <div class="post-list">
+          <div v-for="post in notices" :key="post.id" class="post-item">
+            <div class="post-row" @click="togglePost(post)">
               <span v-if="post.important" class="post-badge">중요</span>
               <span class="post-title">{{ post.title }}</span>
-              <span class="post-date">{{ post.date }}</span>
+              <span class="post-date">{{ post.created?.slice(0, 10) }}</span>
+              <template v-if="store.isAdmin">
+                <button class="delete-btn" @click.stop="startEditNotice(post)">
+                  수정
+                </button>
+                <button class="delete-btn" @click.stop="deleteNotice(post.id)">
+                  삭제
+                </button>
+              </template>
               <i class="bi" :class="post.open ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
             </div>
             <div v-if="post.open" class="post-content">
@@ -43,35 +125,87 @@
         </div>
       </div>
 
-      <!-- ===== FAQ ===== -->
+      <!-- ===== QnA ===== -->
       <div v-if="currentTab === 'faq'">
-        <!-- FAQ 카테고리 -->
+        <!-- 관리자 등록 버튼 -->
+        <div v-if="store.isAdmin" style="margin-bottom: 16px">
+          <button class="submit-btn" @click="showQnaForm = !showQnaForm">QnA 등록</button>
+        </div>
+
+        <!-- 등록/수정 폼 -->
+        <div
+          v-if="store.isAdmin && showQnaForm"
+          class="inquiry-form"
+          style="margin-bottom: 24px"
+        >
+          <div class="form-group">
+            <label class="form-label-custom">카테고리</label>
+            <select v-model="qnaForm.category" class="input-custom">
+              <option value="">선택해주세요</option>
+              <option>주문/결제</option>
+              <option>배송</option>
+              <option>교환/반품</option>
+              <option>상품</option>
+              <option>기타</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label-custom">질문</label>
+            <input
+              v-model="qnaForm.title"
+              type="text"
+              class="input-custom"
+              placeholder="질문 입력"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label-custom">답변</label>
+            <textarea
+              v-model="qnaForm.content"
+              class="textarea-custom"
+              rows="4"
+              placeholder="답변 입력"
+            ></textarea>
+          </div>
+          <div style="display: flex; gap: 8px; justify-content: flex-end">
+            <button class="delete-btn" @click="cancelQnaForm">취소</button>
+            <button class="submit-btn" @click="submitQna">
+              {{ editQnaId ? "수정 완료" : "등록" }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 카테고리 필터 -->
         <div class="faq-cats">
           <button
             v-for="cat in faqCategories"
             :key="cat"
             class="faq-cat-btn"
             :class="{ active: currentFaqCat === cat }"
-            @click="currentFaqCat = cat"
+            @click="filterQna(cat)"
           >
             {{ cat }}
           </button>
         </div>
 
+        <!-- QnA 목록 -->
         <div class="post-list">
-          <div
-            v-for="faq in filteredFaqs"
-            :key="faq.id"
-            class="post-item"
-            @click="togglePost(faq)"
-          >
-            <div class="post-row">
+          <div v-for="item in qnas" :key="item.id" class="post-item">
+            <div class="post-row" @click="toggleQna(item.id)">
               <span class="faq-q">Q</span>
-              <span class="post-title">{{ faq.title }}</span>
-              <i class="bi" :class="faq.open ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+              <span class="post-title">{{ item.title }}</span>
+              <span class="post-date">{{ item.category }}</span>
+              <template v-if="store.isAdmin">
+                <button class="delete-btn" @click.stop="startEditQna(item)">수정</button>
+                <button class="delete-btn" @click.stop="deleteQna(item.id)">삭제</button>
+              </template>
+              <i
+                class="bi"
+                :class="openQna === item.id ? 'bi-chevron-up' : 'bi-chevron-down'"
+              ></i>
             </div>
-            <div v-if="faq.open" class="post-content">
-              <span class="faq-a">A</span> {{ faq.content }}
+            <div v-if="openQna === item.id" class="post-content">
+              <span class="faq-a">A</span> {{ item.content }}
             </div>
           </div>
         </div>
@@ -79,12 +213,13 @@
 
       <!-- ===== 고객문의 ===== -->
       <div v-if="currentTab === 'inquiry'">
-
         <!-- 로그인 필요 안내 -->
         <div v-if="!store.isLoggedIn" class="login-required">
           <i class="bi bi-lock"></i>
           <p>고객문의는 로그인 후 이용 가능합니다.</p>
-          <RouterLink to="/login" class="login-required-btn">로그인하기</RouterLink>
+          <button class="login-required-btn" @click="store.showLoginModal = true">
+            로그인하기
+          </button>
         </div>
 
         <!-- 문의 폼 -->
@@ -102,105 +237,433 @@
             </div>
             <div class="form-group">
               <label class="form-label-custom">제목</label>
-              <input v-model="inquiry.title" type="text" class="input-custom" placeholder="문의 제목 입력" />
+              <input
+                v-model="inquiry.title"
+                type="text"
+                class="input-custom"
+                placeholder="문의 제목 입력"
+              />
             </div>
             <div class="form-group">
               <label class="form-label-custom">내용</label>
-              <textarea v-model="inquiry.content" class="textarea-custom" placeholder="문의 내용을 입력해주세요." rows="5"></textarea>
+              <textarea
+                v-model="inquiry.content"
+                class="textarea-custom"
+                placeholder="문의 내용을 입력해주세요."
+                rows="5"
+              ></textarea>
             </div>
             <button class="submit-btn" @click="submitInquiry">문의 접수</button>
           </div>
-
-          <!-- 내 문의 내역 -->
-          <div v-if="myInquiries.length > 0" class="my-inquiries">
-            <h3 class="my-inquiry-title">내 문의 내역</h3>
-            <div class="post-list">
-              <div v-for="item in myInquiries" :key="item.id" class="post-item">
-                <div class="post-row">
-                  <span class="post-badge" :class="item.status === '답변완료' ? 'done' : ''">
-                    {{ item.status }}
-                  </span>
-                  <span class="post-title">{{ item.title }}</span>
-                  <span class="post-date">{{ item.date }}</span>
+        </div>
+        <!-- 내 문의 내역 -->
+        <div v-if="myInquiries.length > 0" class="my-inquiries">
+          <h3 class="my-inquiry-title">내 문의 내역</h3>
+          <div class="post-list">
+            <div v-for="item in myInquiries" :key="item.id" class="post-item">
+              <div class="post-row" @click="toggleInquiry(item)">
+                <span
+                  class="post-badge"
+                  :class="item.status === '답변완료' ? 'done' : ''"
+                >
+                  {{ item.status }}
+                </span>
+                <span class="post-title">{{ item.title }}</span>
+                <span class="post-date">{{ item.created?.slice(0, 10) }}</span>
+                <button class="delete-btn" @click.stop="startEditInquiry(item)">
+                  수정
+                </button>
+                <button class="delete-btn" @click.stop="deleteInquiry(item.id)">
+                  삭제
+                </button>
+                <i
+                  class="bi"
+                  :class="openInquiry === item.id ? 'bi-chevron-up' : 'bi-chevron-down'"
+                ></i>
+              </div>
+              <div v-if="openInquiry === item.id" class="post-content">
+                <div v-if="editInquiry && editInquiry.id === item.id">
+                  <textarea
+                    v-model="editInquiry.content"
+                    class="textarea-custom"
+                    rows="3"
+                  ></textarea>
+                  <div
+                    style="
+                      display: flex;
+                      gap: 8px;
+                      justify-content: flex-end;
+                      margin-top: 8px;
+                    "
+                  >
+                    <button class="delete-btn" @click="editInquiry = null">취소</button>
+                    <button class="submit-btn" @click="submitEditInquiry(item.id)">
+                      수정 완료
+                    </button>
+                  </div>
+                </div>
+                <div v-else>
+                  <p>{{ item.content }}</p>
+                  <div v-if="item.reply" class="reply-box">
+                    <span class="reply-label">답변</span>
+                    <p>{{ item.reply }}</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
+        <!-- 관리자 전체 문의 -->
+        <div v-if="store.isAdmin" class="my-inquiries">
+          <h3 class="my-inquiry-title">전체 문의 내역 (관리자)</h3>
+          <div class="post-list">
+            <div v-for="item in allInquiries" :key="item.id" class="post-item">
+              <div class="post-row" @click="toggleInquiry(item)">
+                <span
+                  class="post-badge"
+                  :class="item.status === '답변완료' ? 'done' : ''"
+                >
+                  {{ item.status }}
+                </span>
+                <span class="post-title">{{ item.title }}</span>
+                <span class="post-date">{{ item.name }}</span>
+                <button class="delete-btn" @click.stop="deleteInquiry(item.id)">
+                  삭제
+                </button>
+                <i
+                  class="bi"
+                  :class="openInquiry === item.id ? 'bi-chevron-up' : 'bi-chevron-down'"
+                ></i>
+              </div>
+              <div v-if="openInquiry === item.id" class="post-content">
+                <p>{{ item.content }}</p>
+                <div v-if="item.reply" class="reply-box">
+                  <span class="reply-label">답변</span>
+                  <p>{{ item.reply }}</p>
+                </div>
+                <div v-if="!item.reply" class="reply-form">
+                  <textarea
+                    v-model="replyText[item.id]"
+                    class="textarea-custom"
+                    placeholder="답글 입력"
+                    rows="3"
+                  ></textarea>
+                  <button class="submit-btn" @click="submitReply(item.id)">
+                    답글 등록
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useShopStore } from '@/store/shop'
+import { ref, computed, onMounted } from "vue";
+import { useShopStore } from "@/store/shop";
 
-const store = useShopStore()
+const store = useShopStore();
 
 const tabs = [
-  { id: 'notice',  name: '공지사항' },
-  { id: 'faq',     name: 'FAQ' },
-  { id: 'inquiry', name: '고객문의' }
-]
+  { id: "notice", name: "공지사항" },
+  { id: "faq", name: "QnA" },
+  { id: "inquiry", name: "고객문의" },
+];
 
-const currentTab    = ref('notice')
-const currentFaqCat = ref('전체')
+const currentTab = ref("notice");
 
-// 공지사항 데이터
-const notices = ref([
-  { id: 1, important: true,  open: false, title: '[필독] 개인정보처리방침 개정 안내', date: '2025.03.01', content: '안녕하세요. GENTLE MONSTER입니다. 개인정보처리방침이 2025년 3월 1일부로 개정됩니다. 주요 변경사항은 개인정보 보관 기간 및 제3자 제공 항목입니다.' },
-  { id: 2, important: true,  open: false, title: '2025 S/S 신제품 출시 안내', date: '2025.02.20', content: '2025 S/S 시즌 신제품이 출시되었습니다. MUSEE 시리즈 및 ROMA 컬렉션을 만나보세요.' },
-  { id: 3, important: false, open: false, title: '설 연휴 배송 안내', date: '2025.01.15', content: '설 연휴 기간(1/28~2/2) 동안 배송이 지연될 수 있습니다. 양해 부탁드립니다.' },
-  { id: 4, important: false, open: false, title: '시스템 점검 안내 (1/10 02:00~06:00)', date: '2025.01.08', content: '서비스 안정화를 위한 시스템 점검이 진행됩니다. 해당 시간에는 서비스 이용이 불가합니다.' }
-])
+// 공지사항
+const notices = ref([]);
 
-// FAQ 데이터
-const faqCategories = ['전체', '주문/결제', '배송', '교환/반품', '상품']
-
-const faqs = ref([
-  { id: 1, cat: '주문/결제', open: false, title: '주문 취소는 어떻게 하나요?', content: '주문 후 배송 준비 전까지 마이페이지에서 취소 가능합니다. 이미 배송이 시작된 경우 배송 완료 후 반품 처리해 주세요.' },
-  { id: 2, cat: '주문/결제', open: false, title: '결제 수단은 어떤 것이 있나요?', content: '신용카드, 체크카드, 카카오페이, 네이버페이, 계좌이체를 지원합니다.' },
-  { id: 3, cat: '배송',     open: false, title: '배송은 얼마나 걸리나요?', content: '주문 후 1~3 영업일 이내 출고되며, 출고 후 1~2일 내 수령 가능합니다. 제주/도서산간 지역은 추가 시간이 소요될 수 있습니다.' },
-  { id: 4, cat: '배송',     open: false, title: '무료배송 기준이 어떻게 되나요?', content: '5만원 이상 구매 시 무료배송입니다. 5만원 미만의 경우 배송비 3,000원이 부과됩니다.' },
-  { id: 5, cat: '교환/반품', open: false, title: '교환/반품 기간은 얼마나 되나요?', content: '수령 후 30일 이내 교환/반품 신청이 가능합니다. 단, 상품 훼손 또는 사용 흔적이 있는 경우 불가합니다.' },
-  { id: 6, cat: '상품',     open: false, title: '제품 AS는 어떻게 받나요?', content: '구매 후 1년 이내 제품 불량의 경우 무상 AS가 가능합니다. 고객센터로 문의해 주세요.' }
-])
-
-const filteredFaqs = computed(() => {
-  if (currentFaqCat.value === '전체') return faqs.value
-  return faqs.value.filter(f => f.cat === currentFaqCat.value)
-})
-
-// 고객문의
-const inquiry = ref({ type: '', title: '', content: '' })
-const myInquiries = ref([])
-
-function togglePost(post) {
-  post.open = !post.open
+async function loadNotices() {
+  try {
+    const res = await fetch("/api/notice");
+    notices.value = await res.json();
+  } catch (e) {
+    console.error(e);
+  }
 }
 
-function submitInquiry() {
-  if (!inquiry.value.type || !inquiry.value.title || !inquiry.value.content) {
-    return
+// 공지사항 등록 (관리자)
+const noticeForm = ref({ title: "", content: "", important: false });
+const showNoticeForm = ref(false);
+
+async function submitNotice() {
+  if (!noticeForm.value.title || !noticeForm.value.content) {
+    store.showToast("제목과 내용을 입력해주세요.", "error");
+    return;
   }
-  myInquiries.value.unshift({
-    id: Date.now(),
-    title: inquiry.value.title,
-    status: '접수중',
-    date: new Date().toISOString().slice(0, 10).replace(/-/g, '.')
-  })
-  inquiry.value = { type: '', title: '', content: '' }
-  store.showToast('문의가 접수되었습니다.')
+  try {
+    const res = await fetch("/api/notice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(noticeForm.value),
+    });
+    const data = await res.json();
+    if (data.success) {
+      store.showToast("공지사항이 등록되었습니다.");
+      noticeForm.value = { title: "", content: "", important: false };
+      showNoticeForm.value = false;
+      loadNotices();
+    }
+  } catch (e) {
+    store.showToast("오류가 발생했습니다.", "error");
+  }
+}
+
+// 공지사항 수정
+const editNotice = ref(null);
+
+function startEditNotice(item) {
+  editNotice.value = { ...item };
+}
+
+async function submitEditNotice() {
+  try {
+    const res = await fetch(`/api/notice/${editNotice.value.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editNotice.value),
+    });
+    const data = await res.json();
+    if (data.success) {
+      store.showToast("수정되었습니다.");
+      editNotice.value = null;
+      loadNotices();
+    }
+  } catch (e) {
+    store.showToast("오류가 발생했습니다.", "error");
+  }
+}
+
+async function deleteNotice(id) {
+  if (!confirm("삭제하시겠습니까?")) return;
+  try {
+    await fetch(`/api/notice/${id}`, { method: "DELETE" });
+    store.showToast("삭제되었습니다.");
+    loadNotices();
+  } catch (e) {
+    store.showToast("오류가 발생했습니다.", "error");
+  }
+}
+
+// QnA
+const faqCategories = ["전체", "주문/결제", "배송", "교환/반품", "상품", "기타"];
+const currentFaqCat = ref("전체");
+const qnas = ref([]);
+const openQna = ref(null);
+const showQnaForm = ref(false);
+const editQnaId = ref(null);
+const qnaForm = ref({ category: "", title: "", content: "" });
+
+async function loadQnas() {
+  try {
+    const res = await fetch("/api/qna");
+    qnas.value = await res.json();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function filterQna(cat) {
+  currentFaqCat.value = cat;
+  if (cat === "전체") {
+    loadQnas();
+  } else {
+    const res = await fetch(`/api/qna/category/${cat}`);
+    qnas.value = await res.json();
+  }
+}
+
+function toggleQna(id) {
+  openQna.value = openQna.value === id ? null : id;
+}
+
+function startEditQna(item) {
+  editQnaId.value = item.id;
+  qnaForm.value = { category: item.category, title: item.title, content: item.content };
+  showQnaForm.value = true;
+}
+
+function cancelQnaForm() {
+  showQnaForm.value = false;
+  editQnaId.value = null;
+  qnaForm.value = { category: "", title: "", content: "" };
+}
+
+async function submitQna() {
+  if (!qnaForm.value.category || !qnaForm.value.title || !qnaForm.value.content) {
+    store.showToast("모든 항목을 입력해주세요.", "error");
+    return;
+  }
+  try {
+    const url = editQnaId.value ? `/api/qna/${editQnaId.value}` : "/api/qna";
+    const method = editQnaId.value ? "PUT" : "POST";
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(qnaForm.value),
+    });
+    const data = await res.json();
+    if (data.success) {
+      store.showToast(editQnaId.value ? "수정되었습니다." : "등록되었습니다.");
+      cancelQnaForm();
+      loadQnas();
+    }
+  } catch (e) {
+    store.showToast("오류가 발생했습니다.", "error");
+  }
+}
+
+async function deleteQna(id) {
+  if (!confirm("삭제하시겠습니까?")) return;
+  try {
+    await fetch(`/api/qna/${id}`, { method: "DELETE" });
+    store.showToast("삭제되었습니다.");
+    loadQnas();
+  } catch (e) {
+    store.showToast("오류가 발생했습니다.", "error");
+  }
+}
+
+// 고객문의 수정
+const editInquiry = ref(null);
+
+function startEditInquiry(item) {
+  editInquiry.value = { ...item };
+}
+
+async function submitEditInquiry(id) {
+  try {
+    const res = await fetch(`/api/inquiry/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: editInquiry.value.content }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      store.showToast("수정되었습니다.");
+      editInquiry.value = null;
+      loadMyInquiries();
+    }
+  } catch (e) {
+    store.showToast("오류가 발생했습니다.", "error");
+  }
+}
+
+// 고객문의
+const inquiry = ref({ type: "", title: "", content: "" });
+const myInquiries = ref([]);
+const replyText = ref({});
+const openInquiry = ref(null);
+
+// 내 문의 목록 불러오기
+async function loadMyInquiries() {
+  if (!store.user) return;
+  try {
+    const res = await fetch(`/api/inquiry/my/${store.user.loginId}`);
+    myInquiries.value = await res.json();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// 전체 문의 목록 (관리자)
+const allInquiries = ref([]);
+async function loadAllInquiries() {
+  try {
+    const res = await fetch("/api/inquiry/all");
+    allInquiries.value = await res.json();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+onMounted(() => {
+  loadNotices();
+  loadQnas();
+  if (store.isLoggedIn) loadMyInquiries();
+  if (store.isAdmin) loadAllInquiries();
+});
+
+function togglePost(post) {
+  post.open = !post.open;
+}
+
+function toggleInquiry(item) {
+  openInquiry.value = openInquiry.value === item.id ? null : item.id;
+}
+
+async function submitInquiry() {
+  if (!inquiry.value.type || !inquiry.value.title || !inquiry.value.content) {
+    store.showToast("모든 항목을 입력해주세요.", "error");
+    return;
+  }
+  try {
+    const res = await fetch("/api/inquiry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: inquiry.value.type,
+        title: inquiry.value.title,
+        content: inquiry.value.content,
+        loginId: store.user.loginId,
+        name: store.user.name,
+      }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      store.showToast("문의가 접수되었습니다.");
+      inquiry.value = { type: "", title: "", content: "" };
+      loadMyInquiries();
+    }
+  } catch (e) {
+    store.showToast("오류가 발생했습니다.", "error");
+  }
+}
+
+async function deleteInquiry(id) {
+  if (!confirm("삭제하시겠습니까?")) return;
+  try {
+    await fetch(`/api/inquiry/${id}`, { method: "DELETE" });
+    store.showToast("삭제되었습니다.");
+    loadMyInquiries();
+    if (store.isAdmin) loadAllInquiries();
+  } catch (e) {
+    store.showToast("오류가 발생했습니다.", "error");
+  }
+}
+
+async function submitReply(id) {
+  if (!replyText.value[id]) return;
+  try {
+    await fetch(`/api/inquiry/${id}/reply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reply: replyText.value[id] }),
+    });
+    store.showToast("답글이 등록되었습니다.");
+    replyText.value[id] = "";
+    loadAllInquiries();
+    loadMyInquiries();
+  } catch (e) {
+    store.showToast("오류가 발생했습니다.", "error");
+  }
 }
 </script>
 
 <style scoped>
-.board-page { padding: 48px 0 80px; }
+.board-page {
+  padding: 48px 0 80px;
+}
 
-.board-header { margin-bottom: 32px; }
+.board-header {
+  margin-bottom: 32px;
+}
 
 .board-label {
   font-size: 11px;
@@ -210,7 +673,7 @@ function submitInquiry() {
 }
 
 .board-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: "Bebas Neue", sans-serif;
   font-size: 40px;
   letter-spacing: 0.08em;
   color: #f2f0eb;
@@ -220,7 +683,7 @@ function submitInquiry() {
 /* 탭 */
 .board-tabs {
   display: flex;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   margin-bottom: 32px;
 }
 
@@ -249,7 +712,7 @@ function submitInquiry() {
 }
 
 .post-item {
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
 }
 
@@ -269,7 +732,10 @@ function submitInquiry() {
   flex-shrink: 0;
 }
 
-.post-badge.done { background: #4a7c59; color: #fff; }
+.post-badge.done {
+  background: #4a7c59;
+  color: #fff;
+}
 
 .post-title {
   flex: 1;
@@ -312,7 +778,7 @@ function submitInquiry() {
   letter-spacing: 0.05em;
   background: transparent;
   color: #888;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -325,14 +791,14 @@ function submitInquiry() {
 }
 
 .faq-q {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: "Bebas Neue", sans-serif;
   font-size: 16px;
   color: #b8a898;
   flex-shrink: 0;
 }
 
 .faq-a {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: "Bebas Neue", sans-serif;
   font-size: 16px;
   color: #b8a898;
   margin-right: 8px;
@@ -352,7 +818,10 @@ function submitInquiry() {
   color: #444;
 }
 
-.login-required p { margin-bottom: 20px; font-size: 14px; }
+.login-required p {
+  margin-bottom: 20px;
+  font-size: 14px;
+}
 
 .login-required-btn {
   display: inline-block;
@@ -367,7 +836,7 @@ function submitInquiry() {
 /* 문의 폼 */
 .inquiry-form {
   background: #111;
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   padding: 24px;
   margin-bottom: 32px;
   display: flex;
@@ -375,7 +844,11 @@ function submitInquiry() {
   gap: 16px;
 }
 
-.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 .form-label-custom {
   font-size: 11px;
@@ -387,30 +860,34 @@ function submitInquiry() {
 .input-custom {
   width: 100%;
   background: #0d0d0d;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #f2f0eb;
   padding: 10px 14px;
   font-size: 13px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: "DM Sans", sans-serif;
   outline: none;
   appearance: none;
 }
 
-.input-custom option { background: #0d0d0d; }
+.input-custom option {
+  background: #0d0d0d;
+}
 
 .textarea-custom {
   width: 100%;
   background: #0d0d0d;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #f2f0eb;
   padding: 10px 14px;
   font-size: 13px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: "DM Sans", sans-serif;
   outline: none;
   resize: vertical;
 }
 
-.textarea-custom::placeholder { color: #555; }
+.textarea-custom::placeholder {
+  color: #555;
+}
 
 .submit-btn {
   padding: 13px;
@@ -425,14 +902,53 @@ function submitInquiry() {
   width: 160px;
 }
 
-.submit-btn:hover { opacity: 0.85; }
+.submit-btn:hover {
+  opacity: 0.85;
+}
 
 /* 내 문의 내역 */
 .my-inquiry-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: "Bebas Neue", sans-serif;
   font-size: 20px;
   letter-spacing: 0.08em;
   color: #f2f0eb;
   margin-bottom: 16px;
+}
+.delete-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #888;
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-btn:hover {
+  background: #ff4444;
+  color: #fff;
+  border-color: #ff4444;
+}
+
+.reply-box {
+  margin-top: 12px;
+  padding: 12px;
+  background: #0d0d0d;
+  border-left: 2px solid #b8a898;
+}
+
+.reply-label {
+  font-size: 11px;
+  color: #b8a898;
+  letter-spacing: 0.1em;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.reply-form {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 </style>

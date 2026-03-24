@@ -1,7 +1,6 @@
 <template>
   <div class="cart-page">
     <div class="container">
-
       <!-- ===== 페이지 타이틀 ===== -->
       <div class="cart-header">
         <p class="cart-label">SHOPPING BAG</p>
@@ -17,10 +16,8 @@
 
       <!-- ===== 장바구니 내용 ===== -->
       <div v-else class="row g-4">
-
         <!-- 왼쪽: 상품 목록 -->
         <div class="col-lg-8">
-
           <!-- 상단 정보 -->
           <div class="cart-info-row">
             <span class="cart-count-text">총 {{ store.cartCount }}개 상품</span>
@@ -29,23 +26,19 @@
 
           <!-- 상품 리스트 -->
           <div class="cart-list">
-            <div
-              v-for="item in store.cart"
-              :key="item.key"
-              class="cart-item"
-            >
+            <div v-for="item in cartItems" :key="item.id" class="cart-item">
               <!-- 상품 이미지 -->
-              <RouterLink :to="`/product/${item.id}`" class="item-img-wrap">
+              <RouterLink :to="`/product/${item.itemId}`" class="item-img-wrap">
                 <img :src="item.image" :alt="item.name" class="item-img" />
               </RouterLink>
 
               <!-- 상품 정보 -->
               <div class="item-info">
                 <div class="item-top">
-                  <RouterLink :to="`/product/${item.id}`" class="item-name">
+                  <RouterLink :to="`/product/${item.itemId}`" class="item-name">
                     {{ item.name }}
                   </RouterLink>
-                  <button class="item-remove" @click="store.removeFromCart(item.key)">
+                  <button class="item-remove" @click="store.removeFromCart(item.id)">
                     <i class="bi bi-x"></i>
                   </button>
                 </div>
@@ -54,18 +47,26 @@
                 <div class="item-options">
                   <span v-if="item.color" class="item-color">
                     <span class="color-dot" :style="{ background: item.color }"></span>
+                    <span style="font-size: 11px; color: #888; margin-left: 4px">{{
+                      item.color
+                    }}</span>
                   </span>
+                  <span v-if="item.color && item.size" style="color: #555">|</span>
                   <span v-if="item.size" class="item-size">{{ item.size }}</span>
+                  <span
+                    v-if="!item.color && !item.size"
+                    style="font-size: 11px; color: #555"
+                    >옵션 없음</span
+                  >
                 </div>
-
                 <!-- 수량 + 가격 -->
                 <div class="item-bottom">
                   <div class="qty-wrap">
-                    <button @click="store.updateCartQty(item.key, -1)">
+                    <button @click="store.updateCartQty(item.id, item.qty - 1)">
                       <i class="bi bi-dash"></i>
                     </button>
                     <span>{{ item.qty }}</span>
-                    <button @click="store.updateCartQty(item.key, 1)">
+                    <button @click="store.updateCartQty(item.id, item.qty + 1)">
                       <i class="bi bi-plus"></i>
                     </button>
                   </div>
@@ -94,7 +95,7 @@
             <div class="summary-row">
               <span>배송비</span>
               <span :class="{ 'free-shipping': shippingFree }">
-                {{ shippingFree ? '무료' : '3,000원' }}
+                {{ shippingFree ? "무료" : "3,000원" }}
               </span>
             </div>
 
@@ -115,9 +116,7 @@
             <RouterLink to="/checkout" class="checkout-btn">
               구매하기 ({{ store.cartCount }}개)
             </RouterLink>
-            <RouterLink to="/products" class="continue-btn">
-              쇼핑 계속하기
-            </RouterLink>
+            <RouterLink to="/products" class="continue-btn"> 쇼핑 계속하기 </RouterLink>
 
             <!-- 안전결제 -->
             <div class="safe-pay">
@@ -128,25 +127,42 @@
             </div>
           </div>
         </div>
-
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useShopStore } from '@/store/shop'
+import { computed, onMounted } from "vue";
+import { useShopStore } from "@/store/shop";
 
-const store = useShopStore()
+const store = useShopStore();
+
+// 장바구니 아이템에 상품 정보 합치기
+const cartItems = computed(() => {
+  return store.cart.map((item) => {
+    const product = store.getProductById(item.itemId);
+    return {
+      ...item,
+      name: product?.name || "상품명 없음",
+      price: product?.price || 0,
+      image: product?.images?.[0] || "",
+      discountRate: product?.discountRate || 0,
+    };
+  });
+});
 
 // 5만원 이상 무료배송
-const shippingFree = computed(() => store.cartTotal >= 50000)
+const shippingFree = computed(() => store.cartTotal >= 50000);
 
 // 배송비 포함 총액
-const totalWithShipping = computed(() =>
-  store.cartTotal + (shippingFree.value ? 0 : 3000)
-)
+const totalWithShipping = computed(
+  () => store.cartTotal + (shippingFree.value ? 0 : 3000)
+);
+
+onMounted(() => {
+  store.fetchData();
+});
 </script>
 
 <style scoped>
@@ -168,7 +184,7 @@ const totalWithShipping = computed(() =>
 }
 
 .cart-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: "Bebas Neue", sans-serif;
   font-size: 40px;
   letter-spacing: 0.08em;
   color: #f2f0eb;
@@ -205,7 +221,9 @@ const totalWithShipping = computed(() =>
   transition: opacity 0.2s;
 }
 
-.empty-btn:hover { opacity: 0.85; }
+.empty-btn:hover {
+  opacity: 0.85;
+}
 
 /* ===== 상단 정보 행 ===== */
 .cart-info-row {
@@ -214,7 +232,7 @@ const totalWithShipping = computed(() =>
   align-items: center;
   margin-bottom: 16px;
   padding-bottom: 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .cart-count-text {
@@ -232,14 +250,16 @@ const totalWithShipping = computed(() =>
   transition: color 0.2s;
 }
 
-.clear-btn:hover { color: #c0392b; }
+.clear-btn:hover {
+  color: #c0392b;
+}
 
 /* ===== 상품 리스트 ===== */
 .cart-list {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* ===== 장바구니 아이템 ===== */
@@ -284,7 +304,9 @@ const totalWithShipping = computed(() =>
   text-decoration: none;
 }
 
-.item-name:hover { opacity: 0.7; }
+.item-name:hover {
+  opacity: 0.7;
+}
 
 .item-remove {
   background: none;
@@ -297,7 +319,9 @@ const totalWithShipping = computed(() =>
   line-height: 1;
 }
 
-.item-remove:hover { color: #f2f0eb; }
+.item-remove:hover {
+  color: #f2f0eb;
+}
 
 /* 옵션 */
 .item-options {
@@ -313,7 +337,7 @@ const totalWithShipping = computed(() =>
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 1px solid rgba(255,255,255,0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .item-size {
@@ -332,7 +356,7 @@ const totalWithShipping = computed(() =>
 .qty-wrap {
   display: flex;
   align-items: center;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .qty-wrap button {
@@ -346,7 +370,7 @@ const totalWithShipping = computed(() =>
 }
 
 .qty-wrap button:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .qty-wrap span {
@@ -365,7 +389,7 @@ const totalWithShipping = computed(() =>
 /* ===== 주문 요약 ===== */
 .order-summary {
   background: #111;
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   padding: 28px;
   position: sticky;
   top: 80px;
@@ -379,7 +403,7 @@ const totalWithShipping = computed(() =>
 }
 
 .summary-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: "Bebas Neue", sans-serif;
   font-size: 28px;
   letter-spacing: 0.08em;
   color: #f2f0eb;
@@ -388,7 +412,7 @@ const totalWithShipping = computed(() =>
 
 .summary-divider {
   height: 1px;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.08);
   margin: 20px 0;
 }
 
@@ -433,7 +457,9 @@ const totalWithShipping = computed(() =>
   transition: opacity 0.2s;
 }
 
-.checkout-btn:hover { opacity: 0.85; }
+.checkout-btn:hover {
+  opacity: 0.85;
+}
 
 .continue-btn {
   display: block;
@@ -444,7 +470,7 @@ const totalWithShipping = computed(() =>
   font-size: 12px;
   letter-spacing: 0.1em;
   text-decoration: none;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   transition: all 0.2s;
 }
 
@@ -479,7 +505,9 @@ const totalWithShipping = computed(() =>
 
 /* ===== 모바일 ===== */
 @media (max-width: 768px) {
-  .cart-page { padding: 32px 0 60px; }
+  .cart-page {
+    padding: 32px 0 60px;
+  }
 
   .item-img {
     width: 70px;

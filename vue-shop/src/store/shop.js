@@ -4,41 +4,46 @@ import { ref, computed } from 'vue'
 export const useShopStore = defineStore('shop', () => {
 
   // ===== State =====
-  const products    = ref([])
-  const categories  = ref([])
-  const banners     = ref([])
-  const reviews     = ref([])
-  const loading     = ref(false)
-  const cart        = ref([])
-  const wishlist    = ref([])
-  const toast       = ref({ show: false, message: '', type: 'success' })
+  const products       = ref([])
+  const categories     = ref([])
+  const banners        = ref([])
+  const loading        = ref(false)
+  const cart           = ref([])
+  const wishlist       = ref([])
+  const toast          = ref({ show: false, message: '', type: 'success' })
+  const showLoginModal = ref(false)
 
   // ===== 유저 상태 =====
   const user = ref(JSON.parse(localStorage.getItem('gm_user') || 'null'))
 
+  // 로그인 여부
   const isLoggedIn = computed(() => !!user.value)
+  // 관리자 여부
   const isAdmin    = computed(() => user.value?.role === 'admin')
 
+  // 로그인
   function login(userData) {
     user.value = userData
     localStorage.setItem('gm_user', JSON.stringify(userData))
     showToast(`${userData.name}님, 환영합니다.`)
+    loadCart()
   }
 
+  // 로그아웃 - 장바구니 초기화 후 홈으로 이동
   function logout() {
     user.value = null
     localStorage.removeItem('gm_user')
+    cart.value = []
     showToast('로그아웃 되었습니다.')
+    window.location.href = '/web03/'
   }
 
+  // 회원가입 (로컬스토리지 기반)
   function register(userData) {
-    // 기존 회원 목록 가져오기
     const users = JSON.parse(localStorage.getItem('gm_users') || '[]')
-    // 이메일 중복 체크
     if (users.find(u => u.email === userData.email)) {
       return { success: false, message: '이미 사용중인 이메일입니다.' }
     }
-    // 새 유저 추가
     const newUser = {
       ...userData,
       id: Date.now(),
@@ -52,45 +57,108 @@ export const useShopStore = defineStore('shop', () => {
   }
 
   // ===== API Base URL =====
-  // Spring Boot 연동 시 .env 파일에서 VITE_API_URL=http://localhost:8080/api 설정
-  // 미설정 시 기존 products.json 사용 (로컬 개발)
   const API_URL = import.meta.env.VITE_API_URL
 
-  // ===== 데이터 fetch (Spring Boot 또는 로컬 JSON) =====
-  async function fetchData() {
-    loading.value = true
-    try {
-      if (API_URL) {
-        // Spring Boot 연동 모드 - 엔드포인트별 개별 요청
-        const [productsRes, categoriesRes, bannersRes, reviewsRes] = await Promise.all([
-          fetch(`${API_URL}/products`),
-          fetch(`${API_URL}/categories`),
-          fetch(`${API_URL}/banners`),
-          fetch(`${API_URL}/reviews`)
-        ])
-        products.value   = await productsRes.json()
-        categories.value = await categoriesRes.json()
-        banners.value    = await bannersRes.json()
-        reviews.value    = await reviewsRes.json()
-      } else {
-        // 로컬 JSON 모드 (기존 방식 유지)
-        const res  = await fetch(import.meta.env.BASE_URL + 'products.json')
-        const data = await res.json()
-        products.value   = data.products
-        categories.value = data.categories
-        banners.value    = data.banners
-        reviews.value    = data.reviews
-      }
-    } catch (e) {
-      console.error('데이터를 가져오지 못했습니다.', e)
-    } finally {
-      loading.value = false
+ // ===== 데이터 fetch =====
+async function fetchData() {
+  loading.value = true
+  try {
+    const res  = await fetch(import.meta.env.BASE_URL + 'products.json')
+    const data = await res.json()
+    categories.value = data.categories
+    banners.value    = data.banners
+
+    // DB 상품 + 리뷰 병렬 로드
+    const [itemRes, reviewRes] = await Promise.all([
+      fetch('/api/item'),
+      fetch('/api/review/all')
+    ])
+    const items      = await itemRes.json()
+    const allReviews = await reviewRes.json()
+
+    // 상품별 평균 별점 계산 함수
+    const calcAvgRating = (itemId) => {
+      const rs = allReviews.filter(r => Number(r.itemId) === Number(itemId))
+      return rs.length > 0 ? rs.reduce((sum, r) => sum + r.rating, 0) / rs.length : 0
+    }
+
+   // products.json 상품에 DB 데이터 합치기
+const jsonProducts = data.products.map(product => {
+  const dbItem    = items.find(i => Number(i.id) === Number(product.id))
+  const avgRating = calcAvgRating(product.id)
+  if (dbItem) {
+    // detailsJson 파싱 → details 객체로 변환
+    let details = product.details || {}
+    if (dbItem.detailsJson) {
+      try { details = JSON.parse(dbItem.detailsJson) } catch (e) {}
+    }
+    return {
+      ...product,
+      stock:        dbItem.stock,
+      discountRate: dbItem.discountRate,
+      price:        dbItem.price,
+      category:     dbItem.category || product.category,
+      badge:        dbItem.badge    || product.badge,
+      description:  dbItem.description || product.description,
+      details,
+      avgRating
     }
   }
+  return { ...product, avgRating }
+})
+
+    // DB에만 있는 신규 등록 상품
+    const jsonIds = data.products.map(p => Number(p.id))
+   const dbOnly = items
+  .filter(i => !jsonIds.includes(Number(i.id)))
+  .map(i => {
+    // detailsJson 파싱
+    let details = {}
+    if (i.detailsJson) {
+      try { details = JSON.parse(i.detailsJson) } catch (e) {}
+    }
+    return {
+      id:           Number(i.id),
+      name:         i.name,
+      category:     i.category || 'all',
+      price:        i.price,
+      stock:        i.stock,
+      discountRate: i.discountRate,
+      description:  i.description || '',
+      badge:        i.badge || 'NEW',
+      images:       [i.imagePath || ''],
+      colors:       ['#1A1A1A'],
+      sizes:        ['FREE'],
+      tags:         [],
+      colorProducts: {},
+      details,
+      avgRating:    calcAvgRating(i.id)
+    }
+  })
+
+    products.value = [...jsonProducts, ...dbOnly]
+  } catch (e) {
+    console.error('데이터를 가져오지 못했습니다.', e)
+  } finally {
+    loading.value = false
+  }
+}
 
   // ===== Computed =====
-  const cartCount     = computed(() => cart.value.reduce((sum, i) => sum + i.qty, 0))
-  const cartTotal     = computed(() => cart.value.reduce((sum, i) => sum + i.price * i.qty, 0))
+  // 장바구니 총 수량
+  const cartCount = computed(() =>
+    cart.value.reduce((sum, i) => sum + i.qty, 0)
+  )
+
+  // 장바구니 총 금액 (DB 상품 가격 기준)
+  const cartTotal = computed(() =>
+    cart.value.reduce((sum, item) => {
+      const product = products.value.find(p => p.id === item.itemId)
+      return sum + (product?.price || 0) * item.qty
+    }, 0)
+  )
+
+  // 위시리스트 수량
   const wishlistCount = computed(() => wishlist.value.length)
 
   // ===== 위시리스트 =====
@@ -110,41 +178,90 @@ export const useShopStore = defineStore('shop', () => {
   }
 
   // ===== 장바구니 =====
-  function addToCart(product, qty = 1, color = null, size = null) {
-    const key = `${product.id}-${color || ''}-${size || ''}`
-    const item = cart.value.find(i => i.key === key)
-    if (item) {
-      item.qty += qty
-    } else {
-      cart.value.push({
-        ...product,
-        key,
-        qty,
-        color,
-        size,
-        image: product.images?.[0] || ''
-      })
+
+  // 장바구니 목록 불러오기 (DB에서)
+  async function loadCart() {
+    if (!user.value?.loginId) return
+    try {
+      const res  = await fetch(`/api/cart/${user.value.loginId}`)
+      const data = await res.json()
+      cart.value = data.map(item => ({
+        id:     item.id,
+        itemId: item.itemId,
+        qty:    item.quantity,
+        key:    `${item.itemId}`,
+        color:  item.color,
+        size:   item.size
+      }))
+    } catch (e) {
+      console.error(e)
     }
-    showToast('장바구니에 추가했습니다.')
   }
 
-  function updateCartQty(key, delta) {
-    const item = cart.value.find(i => i.key === key)
-    if (!item) return
-    item.qty += delta
-    if (item.qty <= 0) removeFromCart(key)
+  // 장바구니 추가 (비로그인 시 로그인 모달 표시)
+  async function addToCart(product, qty = 1, color = null, size = null) {
+    if (!user.value?.loginId) {
+      showLoginModal.value = true
+      return
+    }
+    try {
+      const res  = await fetch('/api/cart', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          loginId:  user.value.loginId,
+          itemId:   product.id,
+          quantity: qty,
+          color,
+          size
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        showToast('장바구니에 추가했습니다.')
+        loadCart()
+      }
+    } catch (e) {
+      showToast('오류가 발생했습니다.', 'error')
+    }
   }
 
-  function removeFromCart(key) {
-    const index = cart.value.findIndex(i => i.key === key)
-    if (index > -1) cart.value.splice(index, 1)
+  // 장바구니 수량 변경
+  async function updateCartQty(id, quantity) {
+    try {
+      await fetch(`/api/cart/${id}`, {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ quantity })
+      })
+      loadCart()
+    } catch (e) {
+      console.error(e)
+    }
   }
 
-  function clearCart() {
-    cart.value = []
+  // 장바구니 개별 삭제
+  async function removeFromCart(id) {
+    try {
+      await fetch(`/api/cart/${id}`, { method: 'DELETE' })
+      loadCart()
+    } catch (e) {
+      console.error(e)
+    }
   }
 
-  // ===== 토스트 =====
+  // 장바구니 전체 삭제 (주문 완료 후)
+  async function clearCart() {
+    if (!user.value?.loginId) return
+    try {
+      await fetch(`/api/cart/clear/${user.value.loginId}`, { method: 'DELETE' })
+      cart.value = []
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  // ===== 토스트 알림 =====
   function showToast(message, type = 'success') {
     toast.value = { show: true, message, type }
     setTimeout(() => { toast.value.show = false }, 2000)
@@ -155,20 +272,22 @@ export const useShopStore = defineStore('shop', () => {
     return products.value.find(p => p.id === Number(id))
   }
 
-  function getReviewsByProductId(id) {
-    return reviews.value.filter(r => r.productId === Number(id))
+  // 새로고침 시 로그인 상태면 장바구니 불러오기
+  if (user.value?.loginId) {
+    loadCart()
   }
 
   return {
-    products, categories, banners, reviews, loading,
+    products, categories, banners, loading,
     cart, wishlist, toast,
+    showLoginModal,
     user, isLoggedIn, isAdmin,
     cartCount, cartTotal, wishlistCount,
     login, logout, register,
     isInWishlist, toggleWishlist,
-    addToCart, updateCartQty, removeFromCart, clearCart,
+    loadCart, addToCart, updateCartQty, removeFromCart, clearCart,
     showToast,
-    getProductById, getReviewsByProductId,
+    getProductById,
     fetchData
   }
 })
