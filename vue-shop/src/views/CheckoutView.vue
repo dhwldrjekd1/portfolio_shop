@@ -260,21 +260,21 @@ const form = ref({
   addressDetail: "",
   memo: "",
   memoInput: "",
-  payment: "card",
+  payment: "toss",
   cardNumber: "",
 });
 
 // ===== 결제 수단 목록 =====
 const paymentMethods = [
-  { value: "card", label: "신용카드 / 체크카드", icon: "bi-credit-card" },
+  { value: "toss", label: "토스페이먼츠", icon: "bi-credit-card" },
   { value: "kakao", label: "카카오페이", icon: "bi-phone" },
   { value: "naver", label: "네이버페이", icon: "bi-n-circle" },
   { value: "bank", label: "계좌이체", icon: "bi-bank" },
 ];
 
 // ===== 장바구니 아이템에 상품 정보 합치기 =====
-const cartItems = computed(() => {
-  return store.cart.map((item) => {
+const cartItems = computed(() =>
+  store.cart.map((item) => {
     const product = store.getProductById(item.itemId);
     return {
       ...item,
@@ -282,8 +282,8 @@ const cartItems = computed(() => {
       price: product?.price || 0,
       image: product?.images?.[0] || "",
     };
-  });
-});
+  })
+);
 
 // ===== 배송비 계산 (5만원 이상 무료) =====
 const shippingFree = computed(() => store.cartTotal >= 50000);
@@ -298,7 +298,6 @@ function onMemoChange() {
   if (form.value.memo !== "direct") form.value.memoInput = "";
 }
 
-// ===== 데이터 로드 =====
 onMounted(() => {
   store.fetchData();
 });
@@ -326,15 +325,11 @@ async function placeOrder() {
     return;
   }
   try {
-    // 배송 메모: 직접 입력이면 memoInput, 아니면 선택값
     const memo = form.value.memo === "direct" ? form.value.memoInput : form.value.memo;
-
-    // 주소 조합: (우편번호) 기본주소 상세주소 [배송메모]
     const fullAddress = `(${form.value.zipcode}) ${form.value.address} ${
       form.value.addressDetail
     }${memo ? " [" + memo + "]" : ""}`;
 
-    // 장바구니 → 주문 상품 목록 변환
     const items = store.cart.map((item) => {
       const product = store.getProductById(item.itemId);
       return {
@@ -361,8 +356,44 @@ async function placeOrder() {
     });
     sessionStorage.setItem("last_order_items", JSON.stringify(orderItems));
     sessionStorage.setItem("last_order_total", String(totalWithShipping.value));
+    sessionStorage.setItem("last_order_address", fullAddress);
+    sessionStorage.setItem("last_order_memo", memo || "");
 
-    // 주문 API 호출
+    // ===== 토스페이먼츠 결제 =====
+    if (form.value.payment === "toss") {
+      const keyRes = await fetch("/api/payment/client-key");
+      const keyData = await keyRes.json();
+      const clientKey = keyData.clientKey;
+
+      const orderId = "ORDER-" + Date.now();
+
+      // v2 방식 - loadTossPayments 사용
+      const tossPayments = await window.TossPayments(clientKey);
+
+      // 카드 결제 위젯
+      const payment = tossPayments.payment({
+        customerKey: store.user.loginId, // 고객 고유 키
+      });
+
+      await payment.requestPayment({
+        method: "CARD",
+        amount: {
+          currency: "KRW",
+          value: totalWithShipping.value,
+        },
+        orderId,
+        orderName: cartItems.value
+          .map((i) => i.name)
+          .join(", ")
+          .slice(0, 100),
+        customerName: form.value.name,
+        customerEmail: form.value.email,
+        successUrl: window.location.origin + "/web03/payment/success",
+        failUrl: window.location.origin + "/web03/payment/fail",
+      });
+      return;
+    }
+    // ===== 일반 결제 (카카오/네이버/계좌이체) =====
     const res = await fetch("/api/order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -378,13 +409,14 @@ async function placeOrder() {
     });
     const data = await res.json();
     if (data.success) {
-      await store.clearCart(); // 장바구니 비우기
-      router.push("/order-complete"); // 주문완료 페이지로 이동
+      await store.clearCart();
+      router.push("/order-complete");
     } else {
       store.showToast(data.message || "주문 실패", "error");
     }
   } catch (e) {
-    store.showToast("오류가 발생했습니다.", "error");
+    console.error("결제 오류:", e);
+    store.showToast(e.message || "오류가 발생했습니다.", "error");
   }
 }
 </script>

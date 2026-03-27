@@ -15,6 +15,8 @@ const routes = [
   { path: '/admin', name: 'admin', component: () => import('@/views/AdminView.vue'), meta: { requiresAdmin: true } },
   { path: '/community', name: 'community', component: () => import('@/views/CommunityView.vue') },
   { path: '/mypage', name: 'mypage', component: () => import('@/views/MyPageView.vue'), meta: { requiresAuth: true } },
+  { path: '/payment/success', component: () => import('@/views/PaymentSuccessView.vue')},
+  { path: '/payment/fail', component: () => import('@/views/PaymentFailView.vue')}
 ]
 
 const router = createRouter({
@@ -36,6 +38,7 @@ router.beforeEach((to, from, next) => {
       return
     }
   }
+  
 
   // 로그인 필요 페이지 체크
   if (to.meta.requiresAuth) {
